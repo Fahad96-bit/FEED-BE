@@ -1,9 +1,37 @@
 const express = require("express");
+const path = require("path");
 const feedRoutes = require("./routes/feed");
+const authRoutes = require("./routes/auth");
 const app = express();
 const bodyParser = require("body-parser");
+const cors = require("cors");
+const mongoose = require("mongoose");
+const MONGODB_URI =
+  "mongodb+srv://fahadali:KFNEYjcpGfJRIrtA@cluster0.a01ko.mongodb.net/messages?retryWrites=true&w=majority";
+const multer = require("multer");
+const { v4: uuidv4 } = require("uuid");
 
 // app.use(bodyParser.urlencoded()) urlencoded()    // x-www-format-urlencoded <form> as a post request
+
+const fileStorage = multer.diskStorage({
+  destination: (req, res, cb) => {
+    cb(null, "images");
+  },
+  filename: (req, file, cb) => {
+    cb(null, new Date().toISOString() + "-" + file.originalname);
+  },
+});
+const fileFilter = (req, file, cb) => {
+  if (
+    file.mimetype === "image/png" ||
+    file.mimetype === "image/jpg" ||
+    file.mimetype === "image/jpeg"
+  ) {
+    cb(null, true);
+  } else {
+    cb(null, false);
+  }
+};
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE");
@@ -11,6 +39,28 @@ app.use((req, res, next) => {
   next();
 });
 
+// app.use(cors());
 app.use(bodyParser.json()); // application/json
+app.use(
+  multer({ storage: fileStorage, fileFilter: fileFilter }).single("image")
+);
+app.use("/images", express.static(path.join(__dirname, "images")));
 app.use("/feed", feedRoutes);
-app.listen(8080);
+app.use("/auth", authRoutes);
+
+app.use((error, req, res, next) => {
+  console.log(error);
+  const status = error.statusCode || 500;
+  const message = error.message;
+  const data = error.data;
+  res.status(status).json({
+    message: message,
+    data: data,
+  });
+});
+mongoose
+  .connect(MONGODB_URI)
+  .then((result) => {
+    app.listen(8080);
+  })
+  .catch((err) => console.log(err));
